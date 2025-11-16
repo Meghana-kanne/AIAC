@@ -1,0 +1,255 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SR UNIVERSITY STUDENT PERFORMANCE TRACKER</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #333;
+    }
+    header {
+      background: #004080;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    .section {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      padding: 20px;
+      max-width: 1200px;
+      margin: auto;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      flex: 1 1 400px;
+    }
+    h2 {
+      margin-top: 0;
+      color: #004080;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      padding: 10px 20px;
+      background: #004080;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .score-display {
+      font-weight: bold;
+      margin-top: 10px;
+      color: #007BFF;
+    }
+    .feedback {
+      margin-top: 10px;
+      font-style: italic;
+      color: #28a745;
+    }
+    .records {
+      max-width: 1200px;
+      margin: 20px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    @media (max-width: 900px) {
+      .section {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SR UNIVERSITY STUDENT PERFORMANCE TRACKER</h1>
+  </header>
+
+  <div class="section">
+    <div class="card">
+      <h2>📋 Student Details</h2>
+      <input type="text" id="name" placeholder="Student Name" />
+      <input type="number" id="marks" placeholder="Academic Marks (0–100)" />
+      <input type="number" id="behavior" placeholder="Behavior Score (0–10)" />
+      <input type="number" id="sports" placeholder="Sports Participation (0–10)" />
+      <input type="number" id="extra" placeholder="Extracurricular Activities (0–10)" />
+      <input type="number" id="attendance" placeholder="Attendance Percentage (0–100)" />
+      <button id="submitBtn">Submit</button>
+    </div>
+
+    <div class="card">
+      <h2>📊 Performance Analysis</h2>
+      <div class="score-display" id="scoreDisplay"></div>
+      <div class="feedback" id="feedbackDisplay"></div>
+      <canvas id="chart" width="400" height="300"></canvas>
+    </div>
+  </div>
+
+  <div class="records">
+    <h2>📑 Student Records</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th><th>Score</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="studentTable"></tbody>
+    </table>
+  </div>
+
+  <script>
+    let students = JSON.parse(localStorage.getItem("students") || "[]");
+    let chart;
+
+    document.getElementById("submitBtn").addEventListener("click", addStudent);
+
+    function calculateScore(data) {
+      return (
+        data.marks * 0.4 +
+        data.behavior * 10 * 0.15 +
+        data.sports * 10 * 0.15 +
+        data.extra * 10 * 0.15 +
+        data.attendance * 0.15
+      ).toFixed(2);
+    }
+
+    function getFeedback(data, score) {
+      let compliment = score >= 90 ? "🌟 Excellent!" :
+                       score >= 80 ? "👍 Great job!" :
+                       score >= 70 ? "🙂 Keep improving!" :
+                       "💡 Needs effort!";
+      let weakAreas = [];
+      if (data.marks < 60) weakAreas.push("Academic");
+      if (data.behavior < 5) weakAreas.push("Behavior");
+      if (data.sports < 5) weakAreas.push("Sports");
+      if (data.extra < 5) weakAreas.push("Extracurricular");
+      if (data.attendance < 75) weakAreas.push("Attendance");
+      let feedback = `Compliment: ${compliment}`;
+      if (weakAreas.length) {
+        feedback += ` | Needs improvement in: ${weakAreas.join(", ")}`;
+      }
+      return feedback;
+    }
+
+    function addStudent() {
+      const name = document.getElementById("name").value;
+      const marks = +document.getElementById("marks").value;
+      const behavior = +document.getElementById("behavior").value;
+      const sports = +document.getElementById("sports").value;
+      const extra = +document.getElementById("extra").value;
+      const attendance = +document.getElementById("attendance").value;
+
+      if (!name || marks < 0 || behavior < 0 || sports < 0 || extra < 0 || attendance < 0) {
+        alert("Please fill all fields correctly.");
+        return;
+      }
+
+      const student = { name, marks, behavior, sports, extra, attendance };
+      student.score = calculateScore(student);
+      students.push(student);
+      localStorage.setItem("students", JSON.stringify(students));
+      renderBreakdown(student);
+      renderTable();
+      document.querySelectorAll("input").forEach(i => i.value = "");
+    }
+
+    function renderTable() {
+      const table = document.getElementById("studentTable");
+      table.innerHTML = "";
+      students.forEach((s, i) => {
+        table.innerHTML += `
+          <tr>
+            <td>${s.name}</td>
+            <td>${s.score}%</td>
+            <td>
+              <button onclick="editStudent(${i})">Edit</button>
+              <button onclick="deleteStudent(${i})">Delete</button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    function editStudent(index) {
+      const s = students[index];
+      document.getElementById("name").value = s.name;
+      document.getElementById("marks").value = s.marks;
+      document.getElementById("behavior").value = s.behavior;
+      document.getElementById("sports").value = s.sports;
+      document.getElementById("extra").value = s.extra;
+      document.getElementById("attendance").value = s.attendance;
+      deleteStudent(index);
+    }
+
+    function deleteStudent(index) {
+      students.splice(index, 1);
+      localStorage.setItem("students", JSON.stringify(students));
+      renderTable();
+    }
+
+    function renderBreakdown(student) {
+      document.getElementById("scoreDisplay").innerText = `Overall Score: ${student.score}%`;
+      document.getElementById("feedbackDisplay").innerText = getFeedback(student, student.score);
+
+      const data = {
+        labels: ["Academic", "Behavior", "Sports", "Extracurricular", "Attendance"],
+        datasets: [{
+          label: "Weighted Contribution",
+          data: [
+            student.marks * 0.4,
+            student.behavior * 10 * 0.15,
+            student.sports * 10 * 0.15,
+            student.extra * 10 * 0.15,
+            student.attendance * 0.15
+          ],
+          backgroundColor: ["#007BFF", "#28a745", "#ffc107", "#17a2b8", "#6f42c1"]
+        }]
+      };
+
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById("chart"), {
+        type: "bar",
+        data: data,
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            title: { display: true, text: "Performance Breakdown" }
+          }
+        }
+      });
+    }
+
+    renderTable();
+  </script>
+</body>
+</html>
